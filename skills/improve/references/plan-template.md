@@ -28,6 +28,9 @@ File naming: `plans/NNN-short-slug.md`, numbered in recommended execution order.
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
+>
+> After the drift check, record `git rev-parse --verify HEAD` as
+> `<execution-base>` before making changes. Use this SHA for the scope check.
 
 ## Status
 
@@ -132,7 +135,9 @@ Machine-checkable. ALL must hold:
 - [ ] `pnpm typecheck` exits 0
 - [ ] `pnpm test` exits 0; new tests for <X> exist and pass
 - [ ] `grep -rn "<old pattern>" src/` returns no matches
-- [ ] No files outside the in-scope list are modified (`git status`)
+- [ ] Every path from `git diff --name-status --no-renames <execution-base> HEAD --`
+  and `git status --short --untracked-files=all` is in scope. The diff covers
+  committed changes. Status covers staged, unstaged, and untracked changes.
 - [ ] `plans/README.md` status row updated
 
 ## STOP conditions

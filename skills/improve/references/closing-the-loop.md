@@ -24,8 +24,10 @@ The subagent prompt must contain:
 2. The executor preamble:
 
 > You are the executor for the implementation plan below. Follow it step by
-> step. Run every verification command and confirm the expected result before
-> moving on. Touch only the files listed as in scope. If any STOP condition
+> step. Before making changes, run `git rev-parse --verify HEAD` in your
+> worktree and record the full SHA as the execution base. Run every verification
+> command and confirm the expected result before moving on. Touch only the
+> files listed as in scope. If any STOP condition
 > occurs, stop immediately and report. Do not improvise around obstacles.
 > Commit your work in the worktree following the plan's git workflow section.
 > One override: SKIP the plan's instruction to update `plans/README.md` —
@@ -39,6 +41,7 @@ The subagent prompt must contain:
 
 ```
 STATUS: COMPLETE | STOPPED
+EXECUTION BASE: full SHA recorded at worktree start
 STEPS: per step — done/skipped + verification command result
 STOPPED BECAUSE: (only if STOPPED) which STOP condition, what was observed
 FILES CHANGED: list
@@ -49,11 +52,22 @@ NOTES: anything the reviewer should know (deviations, surprises, judgment calls)
 
 Note on fresh worktrees: they share git history but not `node_modules` or build artifacts — the executor must install dependencies first, and check tooling that resolves from `dist/` may need one build even though the plan's command table (recon'd in the main tree) didn't mention it. Expect this; it isn't a deviation.
 
+Verify the reported execution base against the oldest entry in
+`git -C "<worktree>" reflog --format=%H HEAD`. Check that
+`git -C "<worktree>" merge-base --is-ancestor <execution-base> HEAD` succeeds.
+If the base cannot be verified, stop the review and report the gap.
+
 Review like a tech lead reviewing a PR against the spec — never fix anything yourself:
 
 1. **Re-run every done criterion** in the worktree. Don't trust the executor's report — verify.
-2. **Scope compliance**: `git -C <worktree> diff --stat` against the plan's in-scope list. Any file outside scope fails review, full stop.
-3. **Read the full diff.** Judge it against "Why this matters" (does it solve the actual problem?) and the repo conventions named in the plan (does it look like the rest of the codebase?).
+2. **Scope compliance.** Compare the paths from
+   `git -C "<worktree>" diff --name-status --no-renames <execution-base> HEAD --`
+   with the plan's in-scope list. Check staged, unstaged, and untracked
+   leftovers separately with `git -C "<worktree>" status --short --untracked-files=all`.
+   Any file outside scope fails review. Resolve leftover changes before approval.
+3. **Read the full diff.** Use `git -C "<worktree>" diff <execution-base> HEAD --`.
+   Judge it against "Why this matters" (does it solve the actual problem?)
+   and the repo conventions named in the plan (does it look like the rest of the codebase?).
 4. **Audit the new tests.** Executors game criteria — a test that asserts nothing meaningful passes `pnpm test` and proves nothing. Read what the tests assert.
 
 ### Verdict
